@@ -58,3 +58,6 @@ Thumbs.db
 # Secrets
 .env
 *.env
+
+# Reference repositories
+reference/

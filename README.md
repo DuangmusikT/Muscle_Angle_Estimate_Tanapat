@@ -37,15 +37,25 @@ muscle_estimate_project/
 
 ## Setup
 
-### Installation
+### Installation (Conda recommended)
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create conda environment
+conda create -n muscle_estimate python=3.9 -y
+conda activate muscle_estimate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install PyTorch (adjust CUDA version if needed)
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
+
+# Install other dependencies
+conda install numpy pandas scipy scikit-learn matplotlib seaborn pyyaml tqdm -y
+conda install -c conda-forge opencv mediapipe -y
+conda install -c conda-forge jupyter ipykernel -y
+conda install -c conda-forge tensorboard -y
+conda install -c conda-forge nptdms -y
+
+# Register with Jupyter
+python -m ipykernel install --user --name=muscle_estimate --display-name "Python (muscle_estimate)"
 ```
 
 ### Hardware Requirements
@@ -62,16 +72,36 @@ pip install -r requirements.txt
 2. Use OpenCV to extract hand angles from video (ground truth)
 3. Sync sEMG and angle data
 
+### Data Preparation
+
+The project supports multiple data formats from previous work:
+
+**TDMS Format (from sEMG_Robot_Demo project):**
+- Supports National Instruments TDMS files
+- Uses notch filters (50Hz, 100Hz) and low-pass (500Hz)
+- Calculates RMS and EMA features
+
+**CSV Format (from Senkouka project):**
+- Supports CSV files with metadata headers
+- Uses DC blocker → Bessel → Notch filter cascade
+- Sampling rate: 10,000 Hz
+
+**Run data preparation:**
+```bash
+python scripts/prepare_data.py
+```
+This will prompt you to select the data format and provide file paths.
+
 ### Training
 
 ```bash
-python src/models/train.py --config configs/default_config.yaml
+python src/models/train.py --config configs/default_config.yaml --data_dir data/processed
 ```
 
 ### Evaluation
 
 ```bash
-python src/models/evaluate.py --checkpoint data/models/best_model.pth
+python src/models/evaluate.py --checkpoint data/models/best_model.pth --test_data data/processed
 ```
 
 ## Methodology

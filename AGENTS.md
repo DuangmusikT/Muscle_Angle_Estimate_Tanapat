@@ -14,12 +14,34 @@ This project estimates hand joint angles from surface electromyography (sEMG) se
 - `results/`: Experiment results and visualizations
 
 ### Data Pipeline
+
+**Legacy Format Support:**
+The project now supports both your previous data formats:
+- **TDMS format** (from sEMG_Robot_Demo project): Use `EMGAcquisitionLegacy`
+- **CSV format** (from Senkouka project): Use `EMGAcquisitionCSV`
+
+**Standard Pipeline:**
 1. **sEMG Acquisition** (`src/data/emg_acquisition.py`):
    - Load raw sEMG signals
    - Apply notch filter (power line removal)
    - Apply bandpass filter (20-450 Hz)
    - Rectify and normalize
    - Extract time-domain features (MAV, RMS, WL, ZC, SSC)
+
+**Legacy Pipeline (TDMS):**
+1. **sEMG Acquisition** (`src/data/emg_acquisition_legacy.py` - `EMGAcquisitionLegacy`):
+   - Load TDMS files (National Instruments format)
+   - Apply notch filters at 50Hz and 100Hz
+   - Apply 4th-order Butterworth low-pass at 500Hz
+   - Calculate RMS features (200ms window, 20ms step)
+   - Calculate EMA (exponential moving average, alpha=0.05)
+
+**Legacy Pipeline (CSV):**
+1. **sEMG Acquisition** (`src/data/emg_acquisition_legacy.py` - `EMGAcquisitionCSV`):
+   - Load CSV files with header metadata
+   - Apply DC blocker → Bessel filter → Notch filter cascade
+   - Uses gain of 883.97 for voltage conversion
+   - Sampling rate: 10,000 Hz
 
 2. **Angle Detection** (`src/data/angle_detection.py`):
    - Use MediaPipe for hand landmark detection
