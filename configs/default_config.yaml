@@ -1,0 +1,27 @@
+# Default configuration for sEMG to angle estimation training
+
+# Model configuration
+model_name: cnn_lstm  # Options: cnn, lstm, cnn_lstm, attention
+input_channels: 8  # Number of EMG channels
+sequence_length: 200  # Window size in samples
+num_angles: 16  # Number of joint angles to predict
+hidden_dim: 128  # Hidden dimension for models
+
+# Training configuration
+num_epochs: 100
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.00001
+save_freq: 10  # Save checkpoint every N epochs
+
+# Data configuration
+train_data_path: data/processed/train
+val_data_path: data/processed/val
+test_data_path: data/processed/test
+
+# Paths
+checkpoint_dir: data/models
+log_dir: runs
+
+# Device
+device: cuda  # Options: cuda, cpu
