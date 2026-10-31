@@ -2,7 +2,10 @@
 Data Preparation Script
 
 This script processes raw sEMG and video data to create training datasets.
-Supports both TDMS format (from sEMG_Robot_Demo) and CSV format (from Senkouka).
+Supports:
+- TDMS format from Digilent USB1608GX (current setup with 1200 Hz)
+- Legacy TDMS format (from sEMG_Robot_Demo)
+- CSV format (from Senkouka)
 """
 
 import sys
@@ -10,8 +13,72 @@ sys.path.append('..')
 
 import numpy as np
 from pathlib import Path
-from src.data import EMGAcquisitionLegacy, EMGAcquisitionCSV, HandAngleDetector, DataSynchronizer
+from src.data import EMGAcquisition, EMGAcquisitionLegacy, EMGAcquisitionCSV, HandAngleDetector, DataSynchronizer
 from src.utils import split_data, normalize_signals, ensure_dir, save_json
+
+
+def prepare_usb1608gx_data(tdms_path: str, video_path: str, output_dir: str):
+    """Prepare data from TDMS format recorded with Digilent USB1608GX."""
+    print("\n=== USB1608GX TDMS Format Processing ===")
+
+    # Configuration - matches your hardware specs
+    emg_sampling_rate = 1200  # Hz
+    video_fps = 30
+    window_size = 200  # 200 samples = 167ms at 1200Hz
+    overlap = 0.5
+
+    print("\n1. Loading TDMS file from USB1608GX...")
+    emg_acq = EMGAcquisition(
+        sampling_rate=emg_sampling_rate,
+        channels=8,  # Will be determined from actual data
+        notch_freq=50.0,
+        lpf_cutoff=488.652,
+        gain=816.0,
+        ref_voltage=0.0
+    )
+
+    raw_emg, channel_names = emg_acq.load_tdms_usb1608gx(tdms_path)
+    print(f"Loaded EMG data: shape = {raw_emg.shape}")
+    print(f"Channels: {channel_names}")
+    print(f"Actual number of channels: {raw_emg.shape[1]}")
+
+    # Update channels based on actual data
+    emg_acq.channels = raw_emg.shape[1]
+
+    print("\n2. Preprocessing EMG data...")
+    processed_emg = emg_acq.preprocess_pipeline(raw_emg, normalize_method='max', apply_voltage_conversion=True)
+    print(f"Preprocessed EMG data: shape = {processed_emg.shape}")
+
+    # Generate timestamps
+    timestamps = np.arange(len(processed_emg)) / emg_sampling_rate
+    print(f"Duration: {timestamps[-1]:.2f} seconds")
+
+    print("\n3. Extracting hand angles from video...")
+    detector = HandAngleDetector(static_image_mode=False, max_hands=1)
+
+    angles, angle_names = detector.process_video(
+        video_path,
+        output_path=f'{output_dir}/annotated_video.mp4'
+    )
+    print(f"Extracted {len(angle_names)} angles from {len(angles)} frames")
+    print("Angle names:", angle_names)
+
+    print("\n4. Synchronizing sEMG and angle data...")
+    sync = DataSynchronizer(emg_sampling_rate=emg_sampling_rate, video_fps=video_fps)
+
+    synced_emg, synced_angles = sync.sync_data(processed_emg, angles, timestamps)
+    print(f"Synchronized data: EMG shape = {synced_emg.shape}, Angles shape = {synced_angles.shape}")
+
+    print("\n5. Creating training windows...")
+    windows_emg, windows_angles = sync.create_windows(
+        synced_emg,
+        synced_angles,
+        window_size=window_size,
+        overlap=overlap
+    )
+    print(f"Created {len(windows_emg)} windows")
+
+    return windows_emg, windows_angles, angle_names, channel_names, emg_sampling_rate, video_fps, window_size, overlap
 
 
 def prepare_tdms_data(tdms_path: str, video_path: str, output_dir: str):
@@ -126,9 +193,19 @@ def main():
     print("="*60)
 
     # Choose data format
-    data_format = input("\nChoose data format (tdms/csv): ").strip().lower()
+    print("\nAvailable data formats:")
+    print("  1. usb1608gx - TDMS from Digilent USB1608GX (1200 Hz, current setup)")
+    print("  2. tdms - Legacy TDMS format (2000 Hz)")
+    print("  3. csv - CSV format (10000 Hz)")
+    data_format = input("\nChoose data format (usb1608gx/tdms/csv): ").strip().lower()
 
-    if data_format == 'tdms':
+    if data_format == 'usb1608gx':
+        tdms_path = input("Enter path to TDMS file: ").strip()
+        video_path = input("Enter path to video file: ").strip()
+        windows_emg, windows_angles, angle_names, channel_names, fs, fps, window_size, overlap = prepare_usb1608gx_data(
+            tdms_path, video_path, 'data/processed'
+        )
+    elif data_format == 'tdms':
         tdms_path = input("Enter path to TDMS file: ").strip()
         video_path = input("Enter path to video file: ").strip()
         windows_emg, windows_angles, angle_names, channel_names, fs, fps, window_size, overlap = prepare_tdms_data(
@@ -141,7 +218,7 @@ def main():
             csv_path, video_path, 'data/processed'
         )
     else:
-        print("Invalid format. Please choose 'tdms' or 'csv'.")
+        print("Invalid format. Please choose 'usb1608gx', 'tdms', or 'csv'.")
         return
 
     print("\n6. Splitting into train/val/test...")

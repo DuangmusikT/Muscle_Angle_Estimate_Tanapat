@@ -6,7 +6,7 @@ Handles acquisition and preprocessing of surface electromyography signals.
 
 import numpy as np
 from scipy import signal
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 
 class EMGAcquisition:
@@ -53,6 +53,40 @@ class EMGAcquisition:
         # This is a placeholder - adapt to your actual data format
         data = np.load(filepath)
         return data
+
+    def load_tdms_usb1608gx(self, filepath: str) -> Tuple[np.ndarray, List[str]]:
+        """
+        Load EMG data from TDMS file recorded with Digilent USB1608GX.
+
+        Args:
+            filepath: Path to TDMS file
+
+        Returns:
+            Tuple of (data_array, channel_names)
+            data_array shape: (n_samples, n_channels)
+        """
+        from nptdms import TdmsFile
+
+        tdms_file = TdmsFile.read(filepath)
+
+        # Collect all channels from all groups
+        all_channels = []
+        for group in tdms_file.groups():
+            all_channels.extend(group.channels())
+
+        # Extract data from all channels
+        data_list = []
+        channel_names = []
+
+        for channel in all_channels:
+            data = channel[:]
+            data_list.append(data)
+            channel_names.append(channel.path)
+
+        # Stack as (n_samples, n_channels)
+        data_array = np.column_stack(data_list)
+
+        return data_array, channel_names
 
     def convert_to_voltage(self, raw_data: np.ndarray) -> np.ndarray:
         """
