@@ -20,6 +20,10 @@ seaborn>=0.11.0
 scikit-signal>=0.1.0
 nptdms>=1.4.0
 
+# Data Acquisition (Linux, USB-1608GX)
+uldaq>=1.2.3
+# Note: requires libuldaq C library (build from https://github.com/mccdaq/uldaq)
+
 # Utilities
 pyyaml>=6.0
 tqdm>=4.62.0
