@@ -41,13 +41,16 @@ def main():
     norm_params = metadata.get("norm_params", {})
 
     # Load model
-    model = get_model(
-        config["model_name"],
+    model_kwargs = dict(
         input_channels=config["input_channels"],
-        sequence_length=config["sequence_length"],
         num_angles=config["num_angles"],
         hidden_dim=config.get("hidden_dim", 128),
     )
+    if config["model_name"] == "mlp":
+        model_kwargs["input_dim"] = config.get("input_dim", config["input_channels"])
+    else:
+        model_kwargs["sequence_length"] = config["sequence_length"]
+    model = get_model(config["model_name"], **model_kwargs)
     ckpt = torch.load(args.checkpoint, map_location="cpu")
     model.load_state_dict(ckpt["model_state_dict"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -56,9 +59,9 @@ def main():
 
     # EMG source
     if args.simulate:
-        emg_source = SimulatedEMGSource(sampling_rate=args.sampling_rate, n_channels=config["input_channels"])
+        emg_source = SimulatedEMGSource(sampling_rate=args.sampling_rate, n_channels=config.get("emg_channels", 2))
     else:
-        emg_source = USB1608GXSource(sampling_rate=args.sampling_rate, n_channels=config["input_channels"], duration=args.duration)
+        emg_source = USB1608GXSource(sampling_rate=args.sampling_rate, n_channels=config.get("emg_channels", 2), duration=args.duration)
     emg_source.start()
 
     # Angle source (OpenCV)
@@ -88,21 +91,19 @@ def main():
             preprocessor.process(data)
             new_samples_since_pred += len(ts)
 
-        # Predict every 100 new samples
-        if new_samples_since_pred >= 100:
-            window = preprocessor.get_window(config["sequence_length"])
-            if window is not None:
-                x = torch.FloatTensor(window).unsqueeze(0).to(device)
-                with torch.no_grad():
-                    y = model(x)
-                y = y.cpu().numpy().flatten()
-                pred_p = float(y[0])
-                pred_s = float(y[1]) if len(y) > 1 else 0.0
-                kf.predict()
-                kf.update_semg(pred_p, pred_s)
-                preds.append(kf.p)
-                pred_times.append(time.perf_counter() - t0)
-            new_samples_since_pred = 0
+        # Predict when a new stacked feature vector is available
+        feat = preprocessor.get_feature_vector()
+        if feat is not None:
+            x = torch.FloatTensor(feat).unsqueeze(0).to(device)  # (1, 32)
+            with torch.no_grad():
+                y = model(x)
+            y = y.cpu().numpy().flatten()
+            pred_p = float(y[0])
+            pred_s = float(y[1]) if len(y) > 1 else 0.0
+            kf.predict()
+            kf.update_semg(pred_p, pred_s)
+            preds.append(kf.p)
+            pred_times.append(time.perf_counter() - t0)
 
         # Webcam frame + overlay
         ts_v, angle, frame, landmarks = angle_source.read_frame()
