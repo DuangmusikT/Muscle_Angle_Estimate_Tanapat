@@ -13,17 +13,29 @@ from .model_architectures import get_model
 from .dataset import EMGAngleDataset, DataLoader
 
 
-def calculate_metrics(predictions: np.ndarray, targets: np.ndarray) -> Dict[str, float]:
+def calculate_metrics(predictions: np.ndarray, targets: np.ndarray, representation: str = 'angle') -> Dict[str, float]:
     """
     Calculate evaluation metrics.
 
     Args:
         predictions: Model predictions (n_samples, n_angles)
         targets: Ground truth angles (n_samples, n_angles)
+        representation: 'angle' for direct angles, 'sincos' for sin/cos representation
 
     Returns:
         Dictionary of metrics
     """
+    # Convert sin/cos back to angles if needed
+    if representation == 'sincos':
+        # sin_p, cos_p, sin_s, cos_s -> p, s
+        pred_p = np.rad2deg(np.arctan2(predictions[:, 0], predictions[:, 1])) % 360.0
+        pred_s = np.rad2deg(np.arctan2(predictions[:, 2], predictions[:, 3])) * 100.0
+        predictions = np.column_stack([pred_p, pred_s])
+
+        targ_p = np.rad2deg(np.arctan2(targets[:, 0], targets[:, 1])) % 360.0
+        targ_s = np.rad2deg(np.arctan2(targets[:, 2], targets[:, 3])) * 100.0
+        targets = np.column_stack([targ_p, targ_s])
+
     # Mean Absolute Error (MAE)
     mae = np.mean(np.abs(predictions - targets), axis=0)
     mae_mean = np.mean(mae)
@@ -127,6 +139,16 @@ def main():
     test_emg = np.load(f"{args.test_data}/test_emg.npy")
     test_angles = np.load(f"{args.test_data}/test_angles.npy")
 
+    # Load metadata to check representation
+    import json
+    metadata_path = f"{args.test_data}/../metadata.json"
+    if Path(metadata_path).exists():
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+        representation = metadata.get('representation', 'angle')
+    else:
+        representation = 'angle'
+
     # Create dataset and dataloader
     test_dataset = EMGAngleDataset(test_emg, test_angles)
     test_loader = DataLoader(
@@ -141,7 +163,7 @@ def main():
     predictions, targets = evaluate_model(model, test_loader, device)
 
     # Calculate metrics
-    metrics = calculate_metrics(predictions, targets)
+    metrics = calculate_metrics(predictions, targets, representation=representation)
 
     # Print results
     print("\n" + "="*50)

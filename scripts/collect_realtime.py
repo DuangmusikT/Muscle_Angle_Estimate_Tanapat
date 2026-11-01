@@ -22,11 +22,11 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
     ensure_dir(output_dir)
 
     if simulate:
-        emg_source = SimulatedEMGSource(sampling_rate=sampling_rate, n_channels=3)
+        emg_source = SimulatedEMGSource(sampling_rate=sampling_rate, n_channels=2)
         print("Using SIMULATED EMG source")
     else:
         emg_source = USB1608GXSource(
-            sampling_rate=sampling_rate, n_channels=3, duration=duration
+            sampling_rate=sampling_rate, n_channels=2, duration=duration
         )
         print("Using USB-1608GX EMG source")
 
@@ -148,11 +148,30 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
     video_times = np.asarray(video_times, dtype=float)
     video_angles = np.asarray(video_angles, dtype=float)
 
+    # Ensure 2D shape for interpolation
+    if video_angles.ndim == 1:
+        video_angles = video_angles.reshape(-1, 1)
+
     # Align video timeline to collection duration if needed
     if use_file and video_times.size > 0 and video_times[-1] > 0:
         # keep as-is; interpolation handles range
         pass
-    vid_speed = np.gradient(video_angles, 1.0 / video_fps)
+
+    # Calculate speed with wrap-around handling
+    vid_speed = np.zeros_like(video_angles)
+    for i in range(1, len(video_angles)):
+        diff = video_angles[i, 0] - video_angles[i-1, 0]
+        # Handle 360° wrap-around
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        vid_speed[i, 0] = diff * video_fps
+    vid_speed[0, 0] = vid_speed[1, 0]  # Handle first sample
+
+    # Clamp speed to reasonable range (±500 deg/sec)
+    vid_speed = np.clip(vid_speed, -500, 500)
+
     sync = DataSynchronizer(emg_sampling_rate=sampling_rate, video_fps=video_fps)
     synced_p0 = sync._interpolate_angles(video_times, video_angles, emg_timestamps)
     synced_s0 = sync._interpolate_angles(video_times, vid_speed, emg_timestamps)
@@ -181,23 +200,17 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         raise RuntimeError('Too few samples for feature stacking.')
     p_labels = synced_p[centers]
     s_labels = synced_s[centers]
-    Y = np.column_stack([p_labels, s_labels])
+
+    # Convert to sin/cos representation to handle wrap-around
+    p_rad = np.deg2rad(p_labels)
+    s_rad = np.deg2rad(s_labels / 100.0)  # Scale speed to avoid extreme values
+    Y = np.column_stack([
+        np.sin(p_rad), np.cos(p_rad),  # Position sin/cos
+        np.sin(s_rad), np.cos(s_rad)   # Speed sin/cos
+    ])
 
     windows_emg, windows_angles = X, Y
-    print(f'Features: X={X.shape}  Y={Y.shape} (p, s)')
-
-
-    # --- Feature extraction + 4-window stacking (32-dim) ---
-    acq = EMGAcquisition(sampling_rate=int(sampling_rate), channels=synced_emg.shape[1])
-    X, centers = acq.extract_stacked_features(synced_emg, window_size=320, hop=40, stack=4)
-    if len(X) == 0:
-        raise RuntimeError("Too few samples for feature stacking.")
-    p_labels = synced_p[centers]
-    s_labels = synced_s[centers]
-    Y = np.column_stack([p_labels, s_labels])
-
-    windows_emg, windows_angles = X, Y
-    print(f"Features: X={X.shape}  Y={Y.shape} (p, s)")
+    print(f'Features: X={X.shape}  Y={Y.shape} (sin_p, cos_p, sin_s, cos_s)')
 
     session_dir = Path(output_dir) / ("session_" + str(int(time.time())))
     ensure_dir(str(session_dir))
@@ -235,10 +248,11 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         "video_fps": video_fps,
         "window_size": window_size,
         "overlap": overlap,
-        "angle_names": ["p", "s"],
+        "angle_names": ["sin_p", "cos_p", "sin_s", "cos_s"],
         "num_channels": int(raw_emg.shape[1]),
-        "num_angles": 2,
+        "num_angles": 4,
         "num_windows": int(len(windows_emg)),
+        "representation": "sincos",  # New: sin/cos representation
         "norm_params": {
             "min": norm_params["min"].tolist(),
             "max": norm_params["max"].tolist(),

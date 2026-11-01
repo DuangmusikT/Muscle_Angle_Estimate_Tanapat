@@ -298,7 +298,7 @@ class AttentionModel(nn.Module):
 class MLPModel(nn.Module):
     """Simple MLP regressor over stacked feature vectors."""
 
-    def __init__(self, input_dim: int = 32, hidden_dim: int = 128, num_angles: int = 2, dropout: float = 0.3):
+    def __init__(self, input_dim: int = 32, hidden_dim: int = 128, num_angles: int = 2, dropout: float = 0.2):
         super(MLPModel, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),

@@ -32,3 +32,7 @@ tensorboard>=2.10.0
 # Jupyter
 jupyter>=1.0.0
 ipykernel>=6.0.0
+
+# Physics Simulation
+mujoco==3.1.6
+mujoco-mjx==3.1.6

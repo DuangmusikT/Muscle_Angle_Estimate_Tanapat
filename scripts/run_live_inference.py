@@ -98,11 +98,17 @@ def main():
             with torch.no_grad():
                 y = model(x)
             y = y.cpu().numpy().flatten()
-            pred_p = float(y[0])
-            pred_s = float(y[1]) if len(y) > 1 else 0.0
-            kf.predict()
-            kf.update_semg(pred_p, pred_s)
-            preds.append(kf.p)
+
+            # Convert sin/cos back to angles
+            sin_p, cos_p, sin_s, cos_s = y[0], y[1], y[2], y[3]
+            pred_p = float(np.rad2deg(np.arctan2(sin_p, cos_p)))
+            pred_s = float(np.rad2deg(np.arctan2(sin_s, cos_s)) * 100.0)  # Scale back
+
+            # Ensure angle is in [0, 360)
+            pred_p = pred_p % 360.0
+
+            # Use raw prediction directly (skip Kalman)
+            preds.append(pred_p)
             pred_times.append(time.perf_counter() - t0)
 
         # Webcam frame + overlay
