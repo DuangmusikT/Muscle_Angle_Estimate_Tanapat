@@ -39,16 +39,67 @@ def summarize_processed(data_dir, train_emg, train_ang, val_emg, val_ang, test_e
         print(f"  window_size   : {meta.get('window_size', 'NA')}")
         print(f"  overlap       : {meta.get('overlap', 'NA')}")
         print(f"  angle_names   : {meta.get('angle_names', 'NA')}")
-        print(f"  channel_names : {meta.get('channel_names', 'NA')}")
     print()
     for name, arr in [("train_emg", train_emg), ("val_emg", val_emg), ("test_emg", test_emg)]:
         print(f"  {name}: min={arr.min():.4f} max={arr.max():.4f} mean={arr.mean():.4f}")
     for name, arr in [("train_angles", train_ang), ("val_angles", val_ang), ("test_angles", test_ang)]:
-        print(f"  {name}: min={arr.min():.4f} max={arr.max():.4f} mean={arr.mean():.4f}")
+        if arr.ndim == 2:
+            for j in range(arr.shape[1]):
+                print(f"  {name}[:,{j}]: min={arr[:,j].min():.4f} max={arr[:,j].max():.4f} mean={arr[:,j].mean():.4f}")
+        else:
+            print(f"  {name}: min={arr.min():.4f} max={arr.max():.4f} mean={arr.mean():.4f}")
     print("=" * 60)
 
 
 def plot_processed(train_emg, train_ang, save_dir, max_windows, show):
+    # Feature-based data: (n, n_features) + (n, n_targets)
+    if train_emg.ndim == 2:
+        n_feat = train_emg.shape[1]
+        n_tgt = train_ang.shape[1] if train_ang.ndim == 2 else 1
+        ang = train_ang.reshape(-1, n_tgt)
+
+        # p and s trajectories
+        fig, axes = plt.subplots(n_tgt, 1, figsize=(10, 3 * n_tgt), sharex=True)
+        if n_tgt == 1:
+            axes = [axes]
+        names = ['p (position)', 's (speed)']
+        for j in range(n_tgt):
+            axes[j].plot(ang[:, j], label=names[j] if j < len(names) else f'target {j}')
+            axes[j].set_title(f'{names[j] if j < len(names) else f"target {j}"} per window (train)')
+            axes[j].set_ylabel('Value')
+            axes[j].grid(True, alpha=0.3)
+            axes[j].legend()
+        axes[-1].set_xlabel('Window index')
+        plt.tight_layout()
+        _finish(fig, save_dir, 'targets_trajectory.png', show)
+
+        # distributions
+        fig, axes = plt.subplots(1, n_tgt, figsize=(5 * n_tgt, 4))
+        if n_tgt == 1:
+            axes = [axes]
+        for j in range(n_tgt):
+            axes[j].hist(ang[:, j], bins=30, edgecolor='black', alpha=0.7)
+            axes[j].set_title(f'{names[j] if j < len(names) else f"target {j}"} distribution')
+            axes[j].set_xlabel('Value')
+        plt.tight_layout()
+        _finish(fig, save_dir, 'targets_hist.png', show)
+
+        # feature-target correlation heatmap
+        try:
+            import seaborn as sns
+            corr = np.corrcoef(train_emg.T, ang.T)[:n_feat, n_feat:]
+            fig, ax = plt.subplots(figsize=(6, 8))
+            sns.heatmap(corr, annot=False, cmap='coolwarm', center=0, ax=ax,
+                        xticklabels=[f't{j}' for j in range(n_tgt)],
+                        yticklabels=[f'f{i}' for i in range(n_feat)])
+            ax.set_title('Feature-target correlation (train)')
+            plt.tight_layout()
+            _finish(fig, save_dir, 'feature_corr.png', show)
+        except Exception as e:
+            print(f'  (skipped heatmap: {e})')
+        return
+
+    # Raw-window data: (n, window, channels)
     n = min(max_windows, len(train_emg))
     n_ch = train_emg.shape[2]
     fig, axes = plt.subplots(n, 1, figsize=(10, 2 * n), sharex=True)
@@ -57,29 +108,28 @@ def plot_processed(train_emg, train_ang, save_dir, max_windows, show):
     for i in range(n):
         for c in range(n_ch):
             axes[i].plot(train_emg[i, :, c], label=f'Ch{c}', alpha=0.8)
-        axes[i].set_title(f'Window {i} | angle={train_ang[i, 0]:.2f}')
+        a0 = train_ang[i]
+        a0 = a0.flatten()
+        axes[i].set_title(f'Window {i} | targets={a0}')
         axes[i].legend(loc='upper right', fontsize=8)
         axes[i].grid(True, alpha=0.3)
     plt.tight_layout()
     _finish(fig, save_dir, 'emg_windows.png', show)
 
+    # angle trajectory
+    ang = train_ang.reshape(len(train_ang), -1)
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(train_ang[:, 0], label='train')
-    ax.set_title('Angle per window (train)')
+    for j in range(ang.shape[1]):
+        ax.plot(ang[:, j], label=f'target {j}')
+    ax.set_title('Targets per window (train)')
     ax.set_xlabel('Window index')
-    ax.set_ylabel('Angle (deg)')
+    ax.set_ylabel('Value')
     ax.grid(True, alpha=0.3)
     ax.legend()
     plt.tight_layout()
-    _finish(fig, save_dir, 'angle_trajectory.png', show)
+    _finish(fig, save_dir, 'targets_trajectory.png', show)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.hist(train_ang[:, 0], bins=30, edgecolor='black', alpha=0.7)
-    ax.set_title('Angle distribution (train)')
-    ax.set_xlabel('Angle (deg)')
-    ax.set_ylabel('Count')
-    plt.tight_layout()
-    _finish(fig, save_dir, 'angle_hist.png', show)
+
 def view_processed(data_dir, save_dir, max_windows, show):
     data_dir = Path(data_dir)
     train_emg = np.load(data_dir / 'train_emg.npy')
@@ -186,4 +236,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
