@@ -152,29 +152,40 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
     if use_file and video_times.size > 0 and video_times[-1] > 0:
         # keep as-is; interpolation handles range
         pass
-
-    synced_angles = np.interp(
-        emg_timestamps,
-        video_times,
-        video_angles,
-        left=np.nan,
-        right=np.nan,
-    ).reshape(-1, 1)
+    vid_speed = np.gradient(video_angles, 1.0 / video_fps)
+    sync = DataSynchronizer(emg_sampling_rate=sampling_rate, video_fps=video_fps)
+    synced_p0 = sync._interpolate_angles(video_times, video_angles, emg_timestamps)
+    synced_s0 = sync._interpolate_angles(video_times, vid_speed, emg_timestamps)
+    synced_p0 = np.asarray(synced_p0).reshape(-1)
+    synced_s0 = np.asarray(synced_s0).reshape(-1)
 
     # --- EMD shift: pair EMG with a future vision angle (+2 frames) ---
     shift = int(round(2.0 * sampling_rate / video_fps))
-    shifted = np.roll(synced_angles, -shift, axis=0)
+    synced_p = np.roll(synced_p0, -shift)
+    synced_s = np.roll(synced_s0, -shift)
     if shift > 0:
-        shifted[-shift:] = np.nan
-    valid = ~np.isnan(synced_angles).any(axis=1) & ~np.isnan(shifted).any(axis=1)
+        synced_p[-shift:] = np.nan
+        synced_s[-shift:] = np.nan
+    valid = ~np.isnan(synced_p) & ~np.isnan(synced_s)
     if not valid.any():
-        raise RuntimeError("No valid angle samples after sync/shift. Re-collect with hand in frame.")
+        raise RuntimeError('No valid angle samples after sync/shift. Re-collect with hand in frame.')
     synced_emg = processed_emg[valid]
-    synced_p = shifted[valid, 0]
+    synced_p = synced_p[valid]
+    synced_s = synced_s[valid]
+    print(f'Synchronized: EMG {synced_emg.shape}, p {synced_p.shape}, s {synced_s.shape}')
 
-    # Velocity target (deg/s) via smoothed central difference
-    dt = 1.0 / sampling_rate
-    synced_s = np.gradient(synced_p, dt)
+    # --- Feature extraction + 4-window stacking (32-dim) ---
+    acq = EMGAcquisition(sampling_rate=int(sampling_rate), channels=synced_emg.shape[1])
+    X, centers = acq.extract_stacked_features(synced_emg, window_size=320, hop=40, stack=4)
+    if len(X) == 0:
+        raise RuntimeError('Too few samples for feature stacking.')
+    p_labels = synced_p[centers]
+    s_labels = synced_s[centers]
+    Y = np.column_stack([p_labels, s_labels])
+
+    windows_emg, windows_angles = X, Y
+    print(f'Features: X={X.shape}  Y={Y.shape} (p, s)')
+
 
     # --- Feature extraction + 4-window stacking (32-dim) ---
     acq = EMGAcquisition(sampling_rate=int(sampling_rate), channels=synced_emg.shape[1])

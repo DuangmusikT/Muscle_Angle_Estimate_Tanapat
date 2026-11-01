@@ -27,6 +27,7 @@ def main():
         raise SystemExit(f'Session dir not found: {session_dir}')
 
     raw_emg = np.load(session_dir / 'raw_emg.npy')
+    raw_emg = raw_emg[:, :2]
     emg_ts = np.load(session_dir / 'emg_timestamps.npy')
     vid_ts = np.load(session_dir / 'video_timestamps.npy')
     vid_ang = np.load(session_dir / 'video_angles.npy')
