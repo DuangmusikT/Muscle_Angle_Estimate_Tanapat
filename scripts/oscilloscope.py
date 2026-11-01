@@ -46,10 +46,10 @@ def main():
         (line,) = ax.plot([], [], lw=1)
         lines.append(line)
         ax.set_title('Ch%d (raw EMG)' % i)
-        ax.set_ylabel('mV')
+        ax.set_ylabel('V')
         ax.grid(True, alpha=0.3)
     for ax in axes:
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_ylim(-1500, 1500)
     axes[-1].set_xlabel('Time (s)')
     fig.tight_layout()
 
@@ -60,12 +60,8 @@ def main():
                 break
             ts, data = src.read_available()
             if ts is not None and data is not None and len(ts) > 0:
-                if args.simulate:
-                    disp = data
-                else:
-                    disp = data * 1000.0  # V -> mV
                 for i in range(args.channels):
-                    for v in disp[:, i]:
+                    for v in data[:, i]:
                         buffers[i].append(v)
                 n = len(buffers[0])
                 t_axis = (np.arange(n) / args.sampling_rate) - (n / args.sampling_rate)
