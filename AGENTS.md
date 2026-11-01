@@ -52,7 +52,7 @@ The project now supports both your previous data formats:
 
 2. **Angle Detection** (`src/data/angle_detection.py`):
    - Use MediaPipe for hand landmark detection
-   - Calculate 1 joint angle (absolute palm-to-vertical angle) — simplified single target
+   - Calculate 1 joint angle (absolute palm-to-vertical angle (directional, 0-360)) — simplified single target
    - Process video frame by frame
 
 3. **Data Synchronization** (`src/data/data_sync.py`):

@@ -124,15 +124,18 @@ class HandAngleDetector:
         # 0: Wrist
         # 9: Middle finger MCP (palm center reference)
 
-        # Single simplified target: absolute angle of the palm relative to the
-        # vertical line of the forearm (image vertical = gravity). Direction
-        # (left/right) is ignored -> always non-negative.
+        # Single simplified target: directional angle of the palm relative to
+        # the vertical line of the forearm (image vertical = gravity).
+        # 0 deg = palm pointing down, 90 deg = left, 180 deg = up, 270 deg = right.
+        # Direction matters: result in [0, 360).
         wrist = landmarks[0]
         palm = landmarks[9]
         dx = float(palm[0] - wrist[0])
         dy = float(palm[1] - wrist[1])  # image y points downward
         angle = float(np.degrees(np.arctan2(dx, dy)))
-        angles['wrist_angle'] = abs(angle)
+        if angle < 0:
+            angle += 360.0
+        angles['wrist_angle'] = angle
 
         return angles
 
