@@ -62,7 +62,7 @@ class SimulatedEMGSource(RealTimeEMGSource):
     def __init__(
         self,
         sampling_rate: float = 1200.0,
-        n_channels: int = 3,
+        n_channels: int = 2,
         seed: Optional[int] = None,
     ):
         self._fs = sampling_rate
@@ -111,7 +111,7 @@ class USB1608GXSource(RealTimeEMGSource):
     def __init__(
         self,
         sampling_rate: float = 1200.0,
-        n_channels: int = 3,
+        n_channels: int = 2,
         duration: float = 60.0,
         gain: float = 816.0,
         device_index: int = 0,

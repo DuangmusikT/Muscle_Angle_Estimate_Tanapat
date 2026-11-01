@@ -2,7 +2,7 @@
 
 # EMG acquisition parameters
 emg_sampling_rate: 1200  # Hz (syncs with 30fps=40 samples/frame, 60fps=20 samples/frame)
-emg_channels: 3  # Number of EMG channels
+emg_channels: 2  # Number of EMG channels (new wiring)
 emg_gain: 816.0  # Amplifier gain
 emg_ref_voltage: 0.0  # Reference voltage
 notch_freq: 50.0  # Power line frequency (Hz)
@@ -12,10 +12,10 @@ lpf_cutoff: 488.652  # Low-pass filter cutoff (Hz)
 video_fps: 30  # Video frame rate (30 or 60 fps recommended)
 
 # Model configuration
-model_name: cnn_lstm  # Options: cnn, lstm, cnn_lstm, attention
-input_channels: 3  # Number of EMG channels
-sequence_length: 200  # Window size in samples (200 samples = 167ms at 1200Hz)
-num_angles: 1  # Single target: wrist/palm angle (simplified)
+model_name: mlp  # Options: mlp, cnn, lstm, cnn_lstm, attention
+input_channels: 32  # Stacked features (8 features × 4 windows)
+sequence_length: 1  # Feature vectors, not raw windows
+num_angles: 2  # [p (position), s (speed)]
 hidden_dim: 128  # Hidden dimension for models
 
 # Training configuration
@@ -36,3 +36,4 @@ log_dir: runs
 
 # Device
 device: cuda  # Options: cuda, cpu
+input_dim: 32

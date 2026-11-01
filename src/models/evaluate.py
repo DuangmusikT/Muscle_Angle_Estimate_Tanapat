@@ -104,13 +104,16 @@ def main():
     print(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
 
     # Create model
-    model = get_model(
-        config['model_name'],
+    model_kwargs = dict(
         input_channels=config['input_channels'],
-        sequence_length=config['sequence_length'],
         num_angles=config['num_angles'],
-        hidden_dim=config.get('hidden_dim', 128)
+        hidden_dim=config.get('hidden_dim', 128),
     )
+    if config['model_name'] == 'mlp':
+        model_kwargs['input_dim'] = config.get('input_dim', config['input_channels'])
+    else:
+        model_kwargs['sequence_length'] = config['sequence_length']
+    model = get_model(config['model_name'], **model_kwargs)
 
     # Load model weights
     model.load_state_dict(checkpoint['model_state_dict'])

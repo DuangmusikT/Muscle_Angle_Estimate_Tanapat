@@ -49,7 +49,7 @@ def main():
         ax.set_ylabel('V')
         ax.grid(True, alpha=0.3)
     for ax in axes:
-        ax.set_ylim(-1500, 1500)
+        ax.set_ylim(-1.5, 1.5)
     axes[-1].set_xlabel('Time (s)')
     fig.tight_layout()
 

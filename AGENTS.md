@@ -22,7 +22,7 @@ The project now supports both your previous data formats:
 
 **Standard Pipeline:**
 1. **sEMG Acquisition** (`src/data/emg_acquisition.py` - `EMGAcquisition`):
-   - Defaults: sampling_rate=1200 Hz, channels=3, notch_freq=50 Hz, lpf_cutoff=488.652 Hz, gain=816.0, ref_voltage=0.0
+   - Defaults: sampling_rate=1200 Hz, channels=2, notch_freq=50 Hz, lpf_cutoff=488.652 Hz, gain=816.0, ref_voltage=0.0
    - Load raw sEMG signals:
      - `load_emg_data(filepath)` — placeholder using `np.load` (adapt to your format)
      - `load_tdms_usb1608gx(filepath)` — TDMS (Digilent USB1608GX) via `nptdms`, returns `(data_array, channel_names)`
@@ -32,7 +32,7 @@ The project now supports both your previous data formats:
    - Full-wave rectification (`np.abs`)
    - Normalize per channel: methods `'max'`, `'zscore'`, or `'minmax'`
    - Extract time-domain features per sliding window (default window_size=200 samples, overlap=0.5):
-     - MAV, RMS, WL, ZC, SSC (5 features × 3 channels = 15-element vector per window)
+     - RMS, MAV, WL, dRMS (4 features × 2 channels = 8 per window; stacked x4 = 32-dim input)
    - End-to-end via `preprocess_pipeline(raw_data, normalize_method='max', apply_voltage_conversion=True)`
 
 **Legacy Pipeline (TDMS):**
@@ -52,7 +52,7 @@ The project now supports both your previous data formats:
 
 2. **Angle Detection** (`src/data/angle_detection.py`):
    - Use MediaPipe for hand landmark detection
-   - Calculate 1 joint angle (absolute palm-to-vertical angle) — simplified single target
+   - Calculate 1 joint angle (absolute palm-to-vertical angle (directional, 0-360)) — simplified single target
    - Process video frame by frame
 
 3. **Data Synchronization** (`src/data/data_sync.py`):

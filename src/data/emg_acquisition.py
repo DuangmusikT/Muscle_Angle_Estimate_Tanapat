@@ -208,6 +208,7 @@ class EMGAcquisition:
 
         features_list = []
         timestamps = []
+        prev_rms = None
 
         for i in range(0, n_samples - window_size + 1, step):
             window = data[i:i + window_size, :]
@@ -216,13 +217,14 @@ class EMGAcquisition:
             mav = np.mean(np.abs(window), axis=0)  # Mean Absolute Value
             rms = np.sqrt(np.mean(window ** 2, axis=0))  # Root Mean Square
             wl = np.sum(np.abs(np.diff(window, axis=0)), axis=0)  # Waveform Length
-            zc = np.sum(np.diff(np.sign(window), axis=0) != 0, axis=0)  # Zero Crossings
-            ssc = np.sum(np.diff(np.diff(window, axis=0), axis=0) != 0, axis=0)  # Slope Sign Changes
+            if prev_rms is None:
+                drms = np.zeros_like(rms)
+            else:
+                drms = rms - prev_rms
+            prev_rms = rms.copy()
 
-            # Combine features
-            window_features = np.concatenate([
-                mav, rms, wl, zc, ssc
-            ])
+            # Combine features: RMS, MAV, WL, dRMS (4 per channel)
+            window_features = np.concatenate([rms, mav, wl, drms])
             features_list.append(window_features)
 
             timestamps.append(i + window_size // 2)
@@ -231,6 +233,28 @@ class EMGAcquisition:
         timestamps = np.array(timestamps)
 
         return features, timestamps
+
+    def extract_stacked_features(
+        self,
+        data: np.ndarray,
+        window_size: int = 320,
+        hop: int = 40,
+        stack: int = 4,
+    ):
+        overlap = 1.0 - (hop / float(window_size))
+        features, centers = self.extract_features(data, window_size=window_size, overlap=overlap)
+
+        if len(features) < stack:
+            return np.zeros((0, features.shape[1] * stack)), np.zeros((0,), dtype=int)
+
+        stacked = []
+        stacked_centers = []
+        for i in range(stack - 1, len(features)):
+            x = np.concatenate([features[i - j] for j in range(stack)])
+            stacked.append(x)
+            stacked_centers.append(centers[i])
+
+        return np.array(stacked), np.array(stacked_centers)
 
     def preprocess_pipeline(
         self,

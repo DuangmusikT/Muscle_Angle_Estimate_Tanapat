@@ -16,6 +16,7 @@ from src.data.realtime_emg import USB1608GXSource, SimulatedEMGSource
 from src.data.realtime_angle import RealTimeAngleSource
 from src.data.realtime_preprocess import RealtimePreprocessor
 from src.models.model_architectures import get_model
+from src.estimation.kalman_observer import KinematicKalmanFilter
 from src.utils import load_json
 
 
@@ -69,6 +70,9 @@ def main():
         norm_params=norm_params,
     )
 
+    kf = KinematicKalmanFilter(dt=1.0/30.0)
+
+
     preds = []
     pred_times = []
     opencv_angles = []
@@ -88,11 +92,15 @@ def main():
         if new_samples_since_pred >= 100:
             window = preprocessor.get_window(config["sequence_length"])
             if window is not None:
-                x = torch.FloatTensor(window).unsqueeze(0).to(device)  # (1, seq, ch)
+                x = torch.FloatTensor(window).unsqueeze(0).to(device)
                 with torch.no_grad():
                     y = model(x)
-                pred = float(y.cpu().numpy().flatten()[0])
-                preds.append(pred)
+                y = y.cpu().numpy().flatten()
+                pred_p = float(y[0])
+                pred_s = float(y[1]) if len(y) > 1 else 0.0
+                kf.predict()
+                kf.update_semg(pred_p, pred_s)
+                preds.append(kf.p)
                 pred_times.append(time.perf_counter() - t0)
             new_samples_since_pred = 0
 
@@ -104,6 +112,8 @@ def main():
             if angle is not None:
                 opencv_angles.append(float(angle))
                 opencv_times.append(ts_v - t0)
+                kf.update_vision(float(angle))
+
             # Overlay last prediction
             if preds:
                 cv2.putText(frame, f"Pred: {preds[-1]:.1f} deg", (10, 30),

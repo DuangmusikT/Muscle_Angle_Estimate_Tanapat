@@ -236,13 +236,16 @@ def main():
     )
 
     # Create model
-    model = get_model(
-        config['model_name'],
+    model_kwargs = dict(
         input_channels=config['input_channels'],
-        sequence_length=config['sequence_length'],
         num_angles=config['num_angles'],
-        hidden_dim=config.get('hidden_dim', 128)
+        hidden_dim=config.get('hidden_dim', 128),
     )
+    if config['model_name'] == 'mlp':
+        model_kwargs['input_dim'] = config.get('input_dim', config['input_channels'])
+    else:
+        model_kwargs['sequence_length'] = config['sequence_length']
+    model = get_model(config['model_name'], **model_kwargs)
 
     # Determine device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

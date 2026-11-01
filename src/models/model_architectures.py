@@ -295,6 +295,28 @@ class AttentionModel(nn.Module):
         return x
 
 
+class MLPModel(nn.Module):
+    """Simple MLP regressor over stacked feature vectors."""
+
+    def __init__(self, input_dim: int = 32, hidden_dim: int = 128, num_angles: int = 2, dropout: float = 0.3):
+        super(MLPModel, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, num_angles),
+        )
+
+    def forward(self, x):
+        # x: (batch, input_dim) or (batch, 1, input_dim)
+        if x.dim() == 3:
+            x = x.squeeze(1)
+        return self.net(x)
+
+
 def get_model(model_name: str, **kwargs) -> nn.Module:
     """
     Get model by name.
@@ -307,6 +329,7 @@ def get_model(model_name: str, **kwargs) -> nn.Module:
         Model instance
     """
     models = {
+        'mlp': MLPModel,
         'cnn': CNNModel,
         'lstm': LSTMModel,
         'cnn_lstm': CNNLSTMModel,
@@ -316,7 +339,7 @@ def get_model(model_name: str, **kwargs) -> nn.Module:
     if model_name not in models:
         raise ValueError(f"Unknown model: {model_name}. Available: {list(models.keys())}")
 
-    # Translate a generic hidden_dim into model-specific argument names
+    # Translate generic args into model-specific argument names
     kwargs = dict(kwargs)
     if 'hidden_dim' in kwargs:
         hd = kwargs.pop('hidden_dim')
@@ -324,7 +347,12 @@ def get_model(model_name: str, **kwargs) -> nn.Module:
             kwargs.setdefault('lstm_hidden', hd)
         elif model_name == 'attention':
             kwargs.setdefault('embed_dim', hd)
+        elif model_name == 'mlp':
+            kwargs.setdefault('hidden_dim', hd)
         else:
             kwargs.setdefault('hidden_dim', hd)
+    if model_name == 'mlp':
+        kwargs.pop('input_channels', None)
+        kwargs['input_dim'] = kwargs.get('input_dim', 32)
 
     return models[model_name](**kwargs)
