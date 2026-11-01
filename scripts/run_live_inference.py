@@ -97,8 +97,10 @@ def main():
             new_samples_since_pred = 0
 
         # Webcam frame + overlay
-        ts_v, angle, frame = angle_source.read_frame()
+        ts_v, angle, frame, landmarks = angle_source.read_frame()
         if frame is not None:
+            if landmarks is not None:
+                angle_source.detector._draw_landmarks(frame, landmarks)
             if angle is not None:
                 opencv_angles.append(float(angle))
                 opencv_times.append(ts_v - t0)

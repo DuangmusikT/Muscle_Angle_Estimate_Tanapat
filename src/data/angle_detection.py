@@ -122,13 +122,17 @@ class HandAngleDetector:
 
         # MediaPipe landmark indices:
         # 0: Wrist
-        # 5: Index finger MCP, 17: Pinky MCP (palm base)
+        # 9: Middle finger MCP (palm center reference)
 
-        # Single simplified target: angle between hand palm and wrist.
-        # Uses the wrist (0) and the two palm-base landmarks (5, 17).
-        angles['wrist_angle'] = self._calculate_angle(
-            landmarks[0], landmarks[5], landmarks[17]
-        )
+        # Single simplified target: absolute angle of the palm relative to the
+        # vertical line of the forearm (image vertical = gravity). Direction
+        # (left/right) is ignored -> always non-negative.
+        wrist = landmarks[0]
+        palm = landmarks[9]
+        dx = float(palm[0] - wrist[0])
+        dy = float(palm[1] - wrist[1])  # image y points downward
+        angle = float(np.degrees(np.arctan2(dx, dy)))
+        angles['wrist_angle'] = abs(angle)
 
         return angles
 

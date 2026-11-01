@@ -64,13 +64,15 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         if use_file:
             pass
         else:
-            ts_v, angle, frame = angle_source.read_frame()
+            ts_v, angle, frame, landmarks = angle_source.read_frame()
             if angle is not None:
                 video_times.append(ts_v - t0)
                 video_angles.append(float(angle))
 
             if preview and frame is not None:
                 disp = frame.copy()
+                if landmarks is not None:
+                    angle_source.detector._draw_landmarks(disp, landmarks)
                 h, w = disp.shape[:2]
                 strip_h = 80
                 y0 = h - strip_h
