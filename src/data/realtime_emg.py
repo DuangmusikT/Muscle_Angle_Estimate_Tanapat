@@ -189,8 +189,8 @@ class USB1608GXSource(RealTimeEMGSource):
         flags = AInScanFlag.DEFAULT
 
         self._ai.a_in_scan(
-            low_channel=0,
-            high_channel=self._channels - 1,
+            low_channel=1,
+            high_channel=1 + self._channels - 1,
             input_mode=input_mode,
             analog_range=analog_range,
             samples_per_channel=self._samples_per_channel,
