@@ -167,21 +167,23 @@ class USB1608GXSource(RealTimeEMGSource):
             pass
 
         # Range
-        ranges = info.get_ranges()
+        ranges = info.get_ranges(input_mode)
         analog_range = None
         for r in ranges:
-            if r == Range.BIP10VOLTS:
+            if r == Range.BIP2VOLTS:
                 analog_range = r
                 break
         if analog_range is None:
-            analog_range = ranges[0] if ranges else Range.BIP10VOLTS
+            analog_range = ranges[0] if ranges else Range.BIP2VOLTS
 
         if not info.has_pacer():
             raise RuntimeError("Device does not support hardware-paced scanning")
 
         self._samples_per_channel = int((self._duration + 5.0) * self._fs)
         total = self._channels * self._samples_per_channel
-        self._buffer = np.zeros(total, dtype=np.double)
+        from ctypes import c_double
+        self._buffer_ctypes = (c_double * total)()
+        self._buffer = np.ctypeslib.as_array(self._buffer_ctypes)
 
         options = ScanOption.CONTINUOUS | ScanOption.DEFAULTIO
         flags = AInScanFlag.DEFAULT
@@ -195,7 +197,7 @@ class USB1608GXSource(RealTimeEMGSource):
             rate=self._fs,
             options=options,
             flags=flags,
-            data=self._buffer,
+            data=self._buffer_ctypes,
         )
 
         self._start_time = time.perf_counter()
