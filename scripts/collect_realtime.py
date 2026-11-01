@@ -3,6 +3,7 @@
 import sys
 import time
 import argparse
+from collections import deque
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -17,7 +18,7 @@ from src.data.angle_detection import HandAngleDetector
 from src.utils import ensure_dir, save_json, split_data, normalize_signals, apply_normalization
 
 
-def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_file, output_dir):
+def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_file, output_dir, preview=False):
     ensure_dir(output_dir)
 
     if simulate:
@@ -48,6 +49,8 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
     video_times = []
     video_angles = []
 
+    emg_preview = deque(maxlen=200)
+
     t0 = time.perf_counter()
 
     while (time.perf_counter() - t0) < duration:
@@ -55,6 +58,8 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         if ts is not None and data is not None and len(ts) > 0:
             ts_collection = ts + (emg_start - t0)
             emg_chunks.append((ts_collection, data))
+            for row in data:
+                emg_preview.append(row)
 
         if use_file:
             pass
@@ -64,7 +69,32 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
                 video_times.append(ts_v - t0)
                 video_angles.append(float(angle))
 
+            if preview and frame is not None:
+                disp = frame.copy()
+                h, w = disp.shape[:2]
+                strip_h = 80
+                y0 = h - strip_h
+                cv2.rectangle(disp, (0, y0), (w, h), (0, 0, 0), -1)
+                if len(emg_preview) > 1:
+                    arr = np.asarray(emg_preview)
+                    for c in range(arr.shape[1]):
+                        ch = arr[:, c]
+                        mn, mx = float(ch.min()), float(ch.max())
+                        rng = (mx - mn) if (mx - mn) > 1e-9 else 1.0
+                        norm = (ch - mn) / rng
+                        pts = [(int(x * (w - 1) / (len(ch) - 1)), int(y0 + (1 - norm[x]) * (strip_h - 4) + 2)) for x in range(len(ch))]
+                        cv2.polylines(disp, [np.array(pts, dtype=np.int32)], False, (0, 255, 0), 1)
+                label = "NA" if angle is None else f"{angle:.1f}"
+                cv2.putText(disp, f"OpenCV angle: {label} deg", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+                cv2.putText(disp, f"EMG samples: {sum(len(c[1]) for c in emg_chunks)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+                cv2.imshow("Collection Preview", disp)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
         time.sleep(0.005)
+
+    if preview:
+        cv2.destroyAllWindows()
 
     emg_source.stop()
     if not use_file and angle_source is not None:
@@ -200,6 +230,7 @@ def main():
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--video_file", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default="data/raw_realtime")
+    parser.add_argument("--preview", action="store_true", help="Show live preview window")
     args = parser.parse_args()
 
     collect(
@@ -210,6 +241,7 @@ def main():
         simulate=args.simulate,
         video_file=args.video_file,
         output_dir=args.output_dir,
+        preview=args.preview,
     )
 
 
