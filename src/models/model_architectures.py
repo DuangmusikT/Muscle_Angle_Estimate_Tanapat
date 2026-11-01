@@ -60,6 +60,7 @@ class CNNModel(nn.Module):
         Returns:
             Predicted angles of shape (batch, num_angles)
         """
+        x = x.transpose(1, 2)  # (batch, channels, sequence_length)
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
         x = self.pool3(F.relu(self.bn3(self.conv3(x))))
@@ -314,5 +315,16 @@ def get_model(model_name: str, **kwargs) -> nn.Module:
 
     if model_name not in models:
         raise ValueError(f"Unknown model: {model_name}. Available: {list(models.keys())}")
+
+    # Translate a generic hidden_dim into model-specific argument names
+    kwargs = dict(kwargs)
+    if 'hidden_dim' in kwargs:
+        hd = kwargs.pop('hidden_dim')
+        if model_name == 'cnn_lstm':
+            kwargs.setdefault('lstm_hidden', hd)
+        elif model_name == 'attention':
+            kwargs.setdefault('embed_dim', hd)
+        else:
+            kwargs.setdefault('hidden_dim', hd)
 
     return models[model_name](**kwargs)

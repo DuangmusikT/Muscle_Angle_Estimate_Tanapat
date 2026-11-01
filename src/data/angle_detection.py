@@ -122,68 +122,10 @@ class HandAngleDetector:
 
         # MediaPipe landmark indices:
         # 0: Wrist
-        # 1-4: Thumb (CMC, MCP, IP, TIP)
-        # 5-8: Index finger (MCP, PIP, DIP, TIP)
-        # 9-12: Middle finger (MCP, PIP, DIP, TIP)
-        # 13-16: Ring finger (MCP, PIP, DIP, TIP)
-        # 17-20: Pinky (MCP, PIP, DIP, TIP)
+        # 5: Index finger MCP, 17: Pinky MCP (palm base)
 
-        # Thumb angles
-        angles['thumb_cmc'] = self._calculate_angle(
-            landmarks[0], landmarks[1], landmarks[2]
-        )
-        angles['thumb_mcp'] = self._calculate_angle(
-            landmarks[1], landmarks[2], landmarks[3]
-        )
-        angles['thumb_ip'] = self._calculate_angle(
-            landmarks[2], landmarks[3], landmarks[4]
-        )
-
-        # Index finger angles
-        angles['index_mcp'] = self._calculate_angle(
-            landmarks[0], landmarks[5], landmarks[6]
-        )
-        angles['index_pip'] = self._calculate_angle(
-            landmarks[5], landmarks[6], landmarks[7]
-        )
-        angles['index_dip'] = self._calculate_angle(
-            landmarks[6], landmarks[7], landmarks[8]
-        )
-
-        # Middle finger angles
-        angles['middle_mcp'] = self._calculate_angle(
-            landmarks[0], landmarks[9], landmarks[10]
-        )
-        angles['middle_pip'] = self._calculate_angle(
-            landmarks[9], landmarks[10], landmarks[11]
-        )
-        angles['middle_dip'] = self._calculate_angle(
-            landmarks[10], landmarks[11], landmarks[12]
-        )
-
-        # Ring finger angles
-        angles['ring_mcp'] = self._calculate_angle(
-            landmarks[0], landmarks[13], landmarks[14]
-        )
-        angles['ring_pip'] = self._calculate_angle(
-            landmarks[13], landmarks[14], landmarks[15]
-        )
-        angles['ring_dip'] = self._calculate_angle(
-            landmarks[14], landmarks[15], landmarks[16]
-        )
-
-        # Pinky angles
-        angles['pinky_mcp'] = self._calculate_angle(
-            landmarks[0], landmarks[17], landmarks[18]
-        )
-        angles['pinky_pip'] = self._calculate_angle(
-            landmarks[17], landmarks[18], landmarks[19]
-        )
-        angles['pinky_dip'] = self._calculate_angle(
-            landmarks[18], landmarks[19], landmarks[20]
-        )
-
-        # Wrist flexion/extension (simplified)
+        # Single simplified target: angle between hand palm and wrist.
+        # Uses the wrist (0) and the two palm-base landmarks (5, 17).
         angles['wrist_angle'] = self._calculate_angle(
             landmarks[0], landmarks[5], landmarks[17]
         )

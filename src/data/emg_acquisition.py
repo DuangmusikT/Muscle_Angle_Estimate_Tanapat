@@ -115,10 +115,12 @@ class EMGAcquisition:
         nyquist = self.sampling_rate / 2
         notch_freq_normalized = self.notch_freq / nyquist
 
-        # Design notch filter with Q=30 for sharp rejection
+        # Design notch filter with Q=30
         b, a = signal.iirnotch(notch_freq_normalized, Q=30)
+        # Convert to SOS for causal (real-time capable) filtering
+        sos = signal.tf2sos(b, a)
 
-        filtered = signal.filtfilt(b, a, data, axis=0)
+        filtered = signal.sosfilt(sos, data, axis=0)
         return filtered
 
     def apply_lowpass_filter(self, data: np.ndarray) -> np.ndarray:
@@ -134,8 +136,8 @@ class EMGAcquisition:
         nyquist = self.sampling_rate / 2
         cutoff = self.lpf_cutoff / nyquist
 
-        b, a = signal.butter(4, cutoff, btype='low')
-        filtered = signal.filtfilt(b, a, data, axis=0)
+        sos = signal.butter(4, cutoff, btype='low', output='sos')
+        filtered = signal.sosfilt(sos, data, axis=0)
         return filtered
 
     def rectify(self, data: np.ndarray) -> np.ndarray:
@@ -215,7 +217,7 @@ class EMGAcquisition:
             rms = np.sqrt(np.mean(window ** 2, axis=0))  # Root Mean Square
             wl = np.sum(np.abs(np.diff(window, axis=0)), axis=0)  # Waveform Length
             zc = np.sum(np.diff(np.sign(window), axis=0) != 0, axis=0)  # Zero Crossings
-            ssc = np.sum(np.diff(np.diff(window), axis=0) != 0, axis=0)  # Slope Sign Changes
+            ssc = np.sum(np.diff(np.diff(window, axis=0), axis=0) != 0, axis=0)  # Slope Sign Changes
 
             # Combine features
             window_features = np.concatenate([

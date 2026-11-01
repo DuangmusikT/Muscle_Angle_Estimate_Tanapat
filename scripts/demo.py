@@ -8,7 +8,7 @@ sys.path.append('..')
 
 import numpy as np
 from src.data import EMGAcquisition, HandAngleDetector, DataSynchronizer
-from src.utils import split_data, normalize_signals
+from src.utils import split_data, normalize_signals, apply_normalization
 from src.visualization import plot_signal_comparison, plot_prediction_comparison
 
 
@@ -26,7 +26,7 @@ def generate_synthetic_emg(n_samples: int, n_channels: int = 8) -> np.ndarray:
     return emg
 
 
-def generate_synthetic_angles(n_samples: int, n_angles: int = 16) -> np.ndarray:
+def generate_synthetic_angles(n_samples: int, n_angles: int = 1) -> np.ndarray:
     """Generate synthetic angle trajectories."""
     angles = np.zeros((n_samples, n_angles))
 
@@ -48,7 +48,7 @@ def main():
     print("\n1. Generating synthetic data...")
     n_samples = 10000  # 10 seconds at 1000 Hz
     n_channels = 8
-    n_angles = 16
+    n_angles = 1
 
     raw_emg = generate_synthetic_emg(n_samples, n_channels)
     angles = generate_synthetic_angles(n_samples, n_angles)
@@ -95,15 +95,15 @@ def main():
     # Normalize
     print("\n6. Normalizing data...")
     train_emg_norm, norm_params = normalize_signals(train_emg, method='minmax')
-    val_emg_norm = normalize_signals(val_emg, params=norm_params, method='minmax')
-    test_emg_norm = normalize_signals(test_emg, params=norm_params, method='minmax')
+    val_emg_norm = apply_normalization(val_emg, norm_params, method='minmax')
+    test_emg_norm = apply_normalization(test_emg, norm_params, method='minmax')
 
     # Visualize
     print("\n7. Visualizing data...")
     timestamps = np.arange(len(synced_emg)) / 1000
     plot_signal_comparison(
         synced_emg[:, :4],
-        synced_angles[:, :4],
+        synced_angles[:, :1],
         timestamps,
         save_path='results/demo_signal_comparison.png'
     )
