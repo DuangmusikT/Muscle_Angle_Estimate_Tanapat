@@ -107,7 +107,7 @@ def main():
             # Ensure angle is in [0, 360)
             pred_p = pred_p % 360.0
 
-            # Use raw prediction directly (skip Kalman to avoid drift)
+            # Use raw prediction directly (skip Kalman)
             preds.append(pred_p)
             pred_times.append(time.perf_counter() - t0)
 

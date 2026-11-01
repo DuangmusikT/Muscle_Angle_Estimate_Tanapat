@@ -16,7 +16,8 @@ model_name: mlp  # Options: mlp, cnn, lstm, cnn_lstm, attention
 input_channels: 32  # Stacked features (8 features × 4 windows)
 sequence_length: 1  # Feature vectors, not raw windows
 num_angles: 4  # [sin_p, cos_p, sin_s, cos_s] - sin/cos representation
-hidden_dim: 128  # Hidden dimension for models
+hidden_dim: 256  # Hidden dimension for models (increased for better capacity)
+input_dim: 32  # Input dimension for MLP
 
 # Training configuration
 num_epochs: 100

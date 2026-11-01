@@ -147,7 +147,7 @@ def main():
 
                 raw_preds.append(pred_p)  # Save raw prediction
 
-                # Use raw prediction directly (skip Kalman to avoid drift)
+                # Use raw prediction directly (skip Kalman)
                 preds.append(pred_p)
                 pred_times.append(time.perf_counter() - t0)
 
