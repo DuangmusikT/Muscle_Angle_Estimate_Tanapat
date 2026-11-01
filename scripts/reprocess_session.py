@@ -51,19 +51,35 @@ def main():
 
     # --- Interpolate angles to EMG timestamps ---
     sync = DataSynchronizer(emg_sampling_rate=int(fs), video_fps=video_fps)
-    synced_angles = sync._interpolate_angles(vid_ts, vid_ang.reshape(-1, 1), emg_ts)
-    valid = ~np.isnan(synced_angles).any(axis=1)
-    if not valid.any():
-        raise SystemExit('No valid (non-NaN) angle samples after sync. Re-collect with hand in frame.')
-    synced_emg = processed_emg[valid]
-    synced_angles = synced_angles[valid]
-    print(f'Synced: EMG {synced_emg.shape}  angles {synced_angles.shape}')
+    synced_angles = sync._interpolate_angles(vid_ts, vid_ang.reshape(-1, 1), emg_ts)  # (N,1)
 
-    # --- Window ---
-    windows_emg, windows_angles = sync.create_windows(
-        synced_emg, synced_angles, window_size=args.window_size, overlap=args.overlap
-    )
-    print(f'Created {len(windows_emg)} windows')
+    # --- EMD shift: pair EMG with a future vision angle (+2 frames) ---
+    shift = int(round(2.0 * fs / video_fps))
+    shifted = np.roll(synced_angles, -shift, axis=0)
+    if shift > 0:
+        shifted[-shift:] = np.nan
+    valid = ~np.isnan(synced_angles).any(axis=1) & ~np.isnan(shifted).any(axis=1)
+    if not valid.any():
+        raise SystemExit('No valid (non-NaN) angle samples after sync/shift. Re-collect with hand in frame.')
+    synced_emg = processed_emg[valid]
+    synced_p = shifted[valid, 0]
+    print(f'Synced: EMG {synced_emg.shape}  p-target {synced_p.shape}')
+
+    # Velocity target (smoothed central difference) in deg/s
+    dt = 1.0 / fs
+    synced_s = np.gradient(synced_p, dt)
+
+    # --- Feature extraction + 4-window stacking (32-dim) ---
+    acq = EMGAcquisition(sampling_rate=int(fs), channels=synced_emg.shape[1])
+    X, centers = acq.extract_stacked_features(synced_emg, window_size=320, hop=40, stack=4)
+    if len(X) == 0:
+        raise SystemExit('Too few samples for feature stacking.')
+    p_labels = synced_p[centers]
+    s_labels = synced_s[centers]
+    Y = np.column_stack([p_labels, s_labels])
+    print(f'Features: X={X.shape}  Y={Y.shape} (p, s)')
+
+    windows_emg, windows_angles = X, Y
     if len(windows_emg) < 5:
         raise SystemExit('Too few windows to split. Collect more data.')
 

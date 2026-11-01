@@ -159,12 +159,34 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         video_angles,
         left=np.nan,
         right=np.nan,
-    )
-    valid = ~np.isnan(synced_angles)
-    synced_emg = processed_emg[valid]
-    synced_angles = synced_angles[valid].reshape(-1, 1)
+    ).reshape(-1, 1)
 
-    print(f"Synchronized: EMG {synced_emg.shape}, angles {synced_angles.shape}")
+    # --- EMD shift: pair EMG with a future vision angle (+2 frames) ---
+    shift = int(round(2.0 * sampling_rate / video_fps))
+    shifted = np.roll(synced_angles, -shift, axis=0)
+    if shift > 0:
+        shifted[-shift:] = np.nan
+    valid = ~np.isnan(synced_angles).any(axis=1) & ~np.isnan(shifted).any(axis=1)
+    if not valid.any():
+        raise RuntimeError("No valid angle samples after sync/shift. Re-collect with hand in frame.")
+    synced_emg = processed_emg[valid]
+    synced_p = shifted[valid, 0]
+
+    # Velocity target (deg/s) via smoothed central difference
+    dt = 1.0 / sampling_rate
+    synced_s = np.gradient(synced_p, dt)
+
+    # --- Feature extraction + 4-window stacking (32-dim) ---
+    acq = EMGAcquisition(sampling_rate=int(sampling_rate), channels=synced_emg.shape[1])
+    X, centers = acq.extract_stacked_features(synced_emg, window_size=320, hop=40, stack=4)
+    if len(X) == 0:
+        raise RuntimeError("Too few samples for feature stacking.")
+    p_labels = synced_p[centers]
+    s_labels = synced_s[centers]
+    Y = np.column_stack([p_labels, s_labels])
+
+    windows_emg, windows_angles = X, Y
+    print(f"Features: X={X.shape}  Y={Y.shape} (p, s)")
 
     session_dir = Path(output_dir) / ("session_" + str(int(time.time())))
     ensure_dir(str(session_dir))
@@ -173,12 +195,9 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
     np.save(session_dir / "video_timestamps.npy", video_times)
     np.save(session_dir / "video_angles.npy", video_angles)
 
+    window_size = 320
+    overlap = 0.875
     sync = DataSynchronizer(emg_sampling_rate=sampling_rate, video_fps=video_fps)
-    window_size = 200
-    overlap = 0.5
-    windows_emg, windows_angles = sync.create_windows(
-        synced_emg, synced_angles, window_size=window_size, overlap=overlap
-    )
     print(f"Created {len(windows_emg)} windows")
 
     train_emg, train_angles, val_emg, val_angles, test_emg, test_angles = split_data(
@@ -205,9 +224,9 @@ def collect(duration, sampling_rate, video_fps, camera_index, simulate, video_fi
         "video_fps": video_fps,
         "window_size": window_size,
         "overlap": overlap,
-        "angle_names": ["wrist_angle"],
+        "angle_names": ["p", "s"],
         "num_channels": int(raw_emg.shape[1]),
-        "num_angles": 1,
+        "num_angles": 2,
         "num_windows": int(len(windows_emg)),
         "norm_params": {
             "min": norm_params["min"].tolist(),
