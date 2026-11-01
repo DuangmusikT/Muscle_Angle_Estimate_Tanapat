@@ -15,7 +15,7 @@ video_fps: 30  # Video frame rate (30 or 60 fps recommended)
 model_name: mlp  # Options: mlp, cnn, lstm, cnn_lstm, attention
 input_channels: 32  # Stacked features (8 features × 4 windows)
 sequence_length: 1  # Feature vectors, not raw windows
-num_angles: 2  # [p (position), s (speed)]
+num_angles: 4  # [sin_p, cos_p, sin_s, cos_s] - sin/cos representation
 hidden_dim: 128  # Hidden dimension for models
 
 # Training configuration
