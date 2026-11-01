@@ -29,7 +29,8 @@ def main():
     if args.simulate:
         src = SimulatedEMGSource(sampling_rate=args.sampling_rate, n_channels=args.channels)
     else:
-        src = USB1608GXSource(sampling_rate=args.sampling_rate, n_channels=args.channels, duration=max(args.duration, 10.0))
+        src_duration = args.duration if args.duration > 0 else 3600.0
+        src = USB1608GXSource(sampling_rate=args.sampling_rate, n_channels=args.channels, duration=src_duration)
 
     src.start()
 
@@ -45,8 +46,10 @@ def main():
         (line,) = ax.plot([], [], lw=1)
         lines.append(line)
         ax.set_title('Ch%d (raw EMG)' % i)
-        ax.set_ylabel('Amplitude')
+        ax.set_ylabel('mV')
         ax.grid(True, alpha=0.3)
+    for ax in axes:
+        ax.set_ylim(-1.5, 1.5)
     axes[-1].set_xlabel('Time (s)')
     fig.tight_layout()
 
@@ -57,8 +60,12 @@ def main():
                 break
             ts, data = src.read_available()
             if ts is not None and data is not None and len(ts) > 0:
+                if args.simulate:
+                    disp = data
+                else:
+                    disp = data * 1000.0  # V -> mV
                 for i in range(args.channels):
-                    for v in data[:, i]:
+                    for v in disp[:, i]:
                         buffers[i].append(v)
                 n = len(buffers[0])
                 t_axis = (np.arange(n) / args.sampling_rate) - (n / args.sampling_rate)
