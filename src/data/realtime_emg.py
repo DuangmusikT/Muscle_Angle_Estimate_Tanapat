@@ -189,8 +189,8 @@ class USB1608GXSource(RealTimeEMGSource):
         flags = AInScanFlag.DEFAULT
 
         self._ai.a_in_scan(
-            low_channel=1,
-            high_channel=1 + self._channels - 1,
+            low_channel=0,
+            high_channel=self._channels - 1,
             input_mode=input_mode,
             analog_range=analog_range,
             samples_per_channel=self._samples_per_channel,
@@ -215,11 +215,14 @@ class USB1608GXSource(RealTimeEMGSource):
 
         start = self._next_sample
         end = start + n_new
-        chunks = []
-        for ch in range(self._channels):
-            off = ch * self._samples_per_channel
-            chunks.append(self._buffer[off + start : off + end])
-        data = np.column_stack(chunks)
+        if end > self._samples_per_channel:
+            end = self._samples_per_channel
+            n_new = end - start
+            if n_new <= 0:
+                return None, None
+        # uldaq buffer is interleaved (sample-major): ch0, ch1, ch2, ...
+        buf = self._buffer.reshape(self._samples_per_channel, self._channels)
+        data = buf[start:end, :].copy()
 
         timestamps = np.arange(start, end) / self._fs
         self._next_sample = end
